@@ -1,0 +1,61 @@
+{
+  "garment_id": "synthetic_tee",
+  "name": "Synthetic short-sleeve (synthetic_tee)",
+  "category": "upper_body",
+  "dominant_color": "#2f5fa8",
+  "sleeve": "short",
+  "source": {
+    "kind": "synthetic",
+    "generator": "backend/tools/make_synthetic.py"
+  },
+  "angles": [
+    {
+      "angle_deg": 0,
+      "view": "front",
+      "image": "synthetic_tee_000.png",
+      "anchors": "synthetic_tee_000.json"
+    },
+    {
+      "angle_deg": 45,
+      "view": "front45",
+      "image": "synthetic_tee_045.png",
+      "anchors": "synthetic_tee_045.json"
+    },
+    {
+      "angle_deg": 90,
+      "view": "side",
+      "image": "synthetic_tee_090.png",
+      "anchors": "synthetic_tee_090.json"
+    },
+    {
+      "angle_deg": 135,
+      "view": "back45",
+      "image": "synthetic_tee_135.png",
+      "anchors": "synthetic_tee_135.json"
+    },
+    {
+      "angle_deg": 180,
+      "view": "back",
+      "image": "synthetic_tee_180.png",
+      "anchors": "synthetic_tee_180.json"
+    },
+    {
+      "angle_deg": 225,
+      "view": "back45_mirror",
+      "image": "synthetic_tee_225.png",
+      "anchors": "synthetic_tee_225.json"
+    },
+    {
+      "angle_deg": 270,
+      "view": "side_mirror",
+      "image": "synthetic_tee_270.png",
+      "anchors": "synthetic_tee_270.json"
+    },
+    {
+      "angle_deg": 315,
+      "view": "front45_mirror",
+      "image": "synthetic_tee_315.png",
+      "anchors": "synthetic_tee_315.json"
+    }
+  ]
+}
