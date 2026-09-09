@@ -78,101 +78,18 @@ class SessionUpdate(BaseModel):
     clear_garment: bool = False
 
 
-# ── Garment catalog (uses transparent PNGs served under /api/static) ─
-# Each garment references a front-view PNG and its anchor points (in image pixel space)
-# so the frontend can perform affine/perspective warping using MediaPipe pose landmarks.
+# ── Garment catalog: real 3D GLB t-shirt with per-garment tint ─
+# The frontend loads the GLB with Three.js and applies MediaPipe pose
+# world-landmarks to translate / scale / rotate the mesh onto the body.
 GARMENTS: list[dict[str, Any]] = [
-    {
-        "id": "white_tee",
-        "name": "AURA Oversized Heavy Tee",
-        "category": "T-Shirts",
-        "color": "Essential White",
-        "tint": None,
-        "image": "/api/static/tee_front.png",
-        # image pixel dims (from the original file)
-        "width": 500, "height": 575,
-        "anchors": {
-            "left_shoulder":  [360.0, 127.5],
-            "right_shoulder": [140.0, 127.5],
-            "left_hip":       [342.5, 437.5],
-            "right_hip":      [147.5, 437.5],
-        },
-    },
-    {
-        "id": "midnight_tee",
-        "name": "Midnight Obsidian Tee",
-        "category": "T-Shirts",
-        "color": "Obsidian Black",
-        "tint": "#111318",
-        "image": "/api/static/tee_front.png",
-        "width": 500, "height": 575,
-        "anchors": {
-            "left_shoulder":  [360.0, 127.5],
-            "right_shoulder": [140.0, 127.5],
-            "left_hip":       [342.5, 437.5],
-            "right_hip":      [147.5, 437.5],
-        },
-    },
-    {
-        "id": "acid_tee",
-        "name": "Acid Lime Statement Tee",
-        "category": "T-Shirts",
-        "color": "Acid Lime",
-        "tint": "#E2F13B",
-        "image": "/api/static/tee_front.png",
-        "width": 500, "height": 575,
-        "anchors": {
-            "left_shoulder":  [360.0, 127.5],
-            "right_shoulder": [140.0, 127.5],
-            "left_hip":       [342.5, 437.5],
-            "right_hip":      [147.5, 437.5],
-        },
-    },
-    {
-        "id": "cobalt_tee",
-        "name": "Cobalt Rush Tee",
-        "category": "T-Shirts",
-        "color": "Cobalt Blue",
-        "tint": "#2A4CFF",
-        "image": "/api/static/tee_front.png",
-        "width": 500, "height": 575,
-        "anchors": {
-            "left_shoulder":  [360.0, 127.5],
-            "right_shoulder": [140.0, 127.5],
-            "left_hip":       [342.5, 437.5],
-            "right_hip":      [147.5, 437.5],
-        },
-    },
-    {
-        "id": "terracotta_tee",
-        "name": "Terracotta Studio Tee",
-        "category": "T-Shirts",
-        "color": "Terracotta",
-        "tint": "#C1613A",
-        "image": "/api/static/tee_front.png",
-        "width": 500, "height": 575,
-        "anchors": {
-            "left_shoulder":  [360.0, 127.5],
-            "right_shoulder": [140.0, 127.5],
-            "left_hip":       [342.5, 437.5],
-            "right_hip":      [147.5, 437.5],
-        },
-    },
-    {
-        "id": "synthetic_tee",
-        "name": "Studio Neutral Tee",
-        "category": "T-Shirts",
-        "color": "Warm Stone",
-        "tint": None,
-        "image": "/api/static/synthetic_front.png",
-        "width": 500, "height": 600,
-        "anchors": {
-            "left_shoulder":  [350.0, 130.0],
-            "right_shoulder": [150.0, 130.0],
-            "left_hip":       [345.0, 460.0],
-            "right_hip":      [155.0, 460.0],
-        },
-    },
+    {"id": "white_tee",     "name": "AURA Oversized Heavy Tee", "category": "T-Shirts", "color": "Essential White", "tint": "#F2F0EA", "model": "/api/static/shirt.glb"},
+    {"id": "midnight_tee",  "name": "Midnight Obsidian Tee",    "category": "T-Shirts", "color": "Obsidian Black", "tint": "#111318", "model": "/api/static/shirt.glb"},
+    {"id": "acid_tee",      "name": "Acid Lime Statement Tee",  "category": "T-Shirts", "color": "Acid Lime",      "tint": "#E2F13B", "model": "/api/static/shirt.glb"},
+    {"id": "cobalt_tee",    "name": "Cobalt Rush Tee",          "category": "T-Shirts", "color": "Cobalt Blue",    "tint": "#2A4CFF", "model": "/api/static/shirt.glb"},
+    {"id": "terracotta_tee","name": "Terracotta Studio Tee",    "category": "T-Shirts", "color": "Terracotta",     "tint": "#C1613A", "model": "/api/static/shirt.glb"},
+    {"id": "forest_tee",    "name": "Deep Forest Tee",          "category": "T-Shirts", "color": "Forest Green",   "tint": "#2E5A3A", "model": "/api/static/shirt.glb"},
+    {"id": "rose_tee",      "name": "Blush Rose Tee",           "category": "T-Shirts", "color": "Blush Rose",     "tint": "#D97A8A", "model": "/api/static/shirt.glb"},
+    {"id": "cream_tee",     "name": "Cream Editorial Tee",      "category": "T-Shirts", "color": "Warm Cream",     "tint": "#EFE4CE", "model": "/api/static/shirt.glb"},
 ]
 
 

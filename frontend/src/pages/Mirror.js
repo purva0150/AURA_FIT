@@ -3,9 +3,11 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Camera, X, Download, Home as HomeIcon, Copy, Check, QrCode as QrIcon, Wifi, WifiOff } from "lucide-react";
 import { fetchGarments, getSession, updateSession, qrUrl } from "../api";
-import { createPoseLandmarker, affineFromCorners } from "../lib/pose";
+import { createPoseLandmarker } from "../lib/pose";
+import { TryOnScene } from "../lib/tryOnScene";
 
-const FIT_SCALE = { fitted: 0.94, regular: 1.0, relaxed: 1.08 };
+const FIT_SCALE = { fitted: 0.94, regular: 1.0, relaxed: 1.10 };
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "";
 
 export default function Mirror() {
   const [params] = useSearchParams();
@@ -13,12 +15,15 @@ export default function Mirror() {
   const token = params.get("s");
 
   const videoRef = useRef(null);
-  const canvasRef = useRef(null);
+  const stageRef = useRef(null);         // wrapper div sized to viewport
+  const overlayCanvasRef = useRef(null); // 2D skeleton overlay
+  const threeCanvasRef = useRef(null);   // Three.js WebGL canvas
   const rafRef = useRef(null);
   const lastVideoTs = useRef(-1);
   const poseRef = useRef(null);
   const streamRef = useRef(null);
-  const garmentImgCache = useRef({});
+  const sceneRef = useRef(null);
+  const loadedGarmentIdRef = useRef(null);
   const stateRef = useRef({ selected_garment: null, fit_mode: "regular", show_skeleton: true });
   const fpsRef = useRef({ frames: 0, last: performance.now(), value: 0 });
 
@@ -30,61 +35,25 @@ export default function Mirror() {
   const [fps, setFps] = useState(0);
   const [poseCount, setPoseCount] = useState(0);
   const [showQrOverlay, setShowQrOverlay] = useState(true);
+  const [modelStatus, setModelStatus] = useState("idle");
 
-  // Redirect if no token
-  useEffect(() => {
-    if (!token) nav("/");
-  }, [token, nav]);
+  useEffect(() => { if (!token) nav("/"); }, [token, nav]);
 
-  // Initial load: garments + session
   useEffect(() => {
     if (!token) return;
     fetchGarments().then(setGarments);
     getSession(token).then((s) => { setSession(s); stateRef.current = s; }).catch(() => nav("/"));
   }, [token, nav]);
 
-  // Poll session for phone updates
   useEffect(() => {
     if (!token) return;
     const iv = setInterval(async () => {
-      try {
-        const s = await getSession(token);
-        setSession(s);
-        stateRef.current = s;
-      } catch {}
+      try { const s = await getSession(token); setSession(s); stateRef.current = s; } catch {}
     }, 900);
     return () => clearInterval(iv);
   }, [token]);
 
-  // Preload garment images (with tint variants)
-  useEffect(() => {
-    garments.forEach((g) => {
-      if (garmentImgCache.current[g.id]) return;
-      const img = new Image();
-      img.crossOrigin = "anonymous";
-      img.src = `${process.env.REACT_APP_BACKEND_URL}${g.image}`;
-      garmentImgCache.current[g.id] = { img, ready: false, tintedCanvas: null };
-      img.onload = () => {
-        garmentImgCache.current[g.id].ready = true;
-        // pre-render tinted variant if needed
-        if (g.tint) {
-          const c = document.createElement("canvas");
-          c.width = img.naturalWidth; c.height = img.naturalHeight;
-          const cx = c.getContext("2d");
-          cx.drawImage(img, 0, 0);
-          cx.globalCompositeOperation = "multiply";
-          cx.fillStyle = g.tint;
-          cx.fillRect(0, 0, c.width, c.height);
-          // preserve original alpha
-          cx.globalCompositeOperation = "destination-in";
-          cx.drawImage(img, 0, 0);
-          garmentImgCache.current[g.id].tintedCanvas = c;
-        }
-      };
-    });
-  }, [garments]);
-
-  // Setup camera + mediapipe
+  // Boot camera + MediaPipe + Three.js scene
   useEffect(() => {
     let cancelled = false;
     async function boot() {
@@ -98,16 +67,34 @@ export default function Mirror() {
         const v = videoRef.current;
         v.srcObject = stream;
         await v.play();
+
+        // Three.js scene
+        const scene = new TryOnScene(threeCanvasRef.current);
+        sceneRef.current = scene;
+        resizeAll();
+
+        // MediaPipe
+        setModelStatus("loading");
         const pose = await createPoseLandmarker();
         poseRef.current = pose;
+        setModelStatus("ready");
         loop();
       } catch (err) {
         setCameraError(err?.message || String(err));
       }
     }
+    const resizeAll = () => {
+      const stage = stageRef.current; if (!stage) return;
+      const rect = stage.getBoundingClientRect();
+      const w = Math.floor(rect.width), h = Math.floor(rect.height);
+      if (overlayCanvasRef.current) { overlayCanvasRef.current.width = w; overlayCanvasRef.current.height = h; }
+      if (sceneRef.current) sceneRef.current.resize(w, h);
+    };
     boot();
+    window.addEventListener("resize", resizeAll);
     return () => {
       cancelled = true;
+      window.removeEventListener("resize", resizeAll);
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       streamRef.current?.getTracks().forEach((t) => t.stop());
       poseRef.current?.close?.();
@@ -115,17 +102,39 @@ export default function Mirror() {
     // eslint-disable-next-line
   }, []);
 
+  // Load / swap garment GLB when session.selected_garment changes
+  useEffect(() => {
+    const scene = sceneRef.current; if (!scene) return;
+    const gid = session?.selected_garment;
+    const g = garments.find((x) => x.id === gid);
+    if (!g) { scene.setVisible(false); loadedGarmentIdRef.current = null; return; }
+    // If it's the same GLB URL as before, just re-tint (no reload)
+    const url = `${BACKEND_URL}${g.model}`;
+    const key = url;
+    if (loadedGarmentIdRef.current === key) {
+      scene.setTint(g.tint || "#ffffff");
+      scene.setVisible(true);
+      return;
+    }
+    setModelStatus("loading-shirt");
+    scene.setTint(g.tint || "#ffffff");
+    scene.loadShirt(url).then(() => {
+      loadedGarmentIdRef.current = key;
+      scene.setTint(g.tint || "#ffffff");
+      scene.setVisible(true);
+      setModelStatus("ready");
+    }).catch((e) => { setModelStatus("shirt-error"); console.error(e); });
+  }, [session?.selected_garment, garments]);
+
   const loop = useCallback(() => {
     const video = videoRef.current;
-    const canvas = canvasRef.current;
-    if (!video || !canvas) { rafRef.current = requestAnimationFrame(loop); return; }
-    const cx = canvas.getContext("2d");
-    const vw = video.videoWidth;
-    const vh = video.videoHeight;
+    const overlay = overlayCanvasRef.current;
+    const scene = sceneRef.current;
+    if (!video || !overlay || !scene) { rafRef.current = requestAnimationFrame(loop); return; }
+    const vw = video.videoWidth, vh = video.videoHeight;
     if (!vw || !vh) { rafRef.current = requestAnimationFrame(loop); return; }
-    if (canvas.width !== vw || canvas.height !== vh) { canvas.width = vw; canvas.height = vh; }
 
-    // FPS
+    // FPS meter
     fpsRef.current.frames += 1;
     const now = performance.now();
     if (now - fpsRef.current.last > 500) {
@@ -134,79 +143,39 @@ export default function Mirror() {
       setFps(fpsRef.current.value);
     }
 
-    // Mirror flip: draw video horizontally flipped
-    cx.save();
-    cx.translate(vw, 0); cx.scale(-1, 1);
-    cx.drawImage(video, 0, 0, vw, vh);
-    cx.restore();
-
-    // Pose detect
-    let landmarks = null;
+    let landmarks = null, worldLandmarks = null;
     if (poseRef.current && video.currentTime !== lastVideoTs.current) {
       lastVideoTs.current = video.currentTime;
       const res = poseRef.current.detectForVideo(video, now);
       if (res?.landmarks?.length) landmarks = res.landmarks[0];
+      if (res?.worldLandmarks?.length) worldLandmarks = res.worldLandmarks[0];
     }
     setPoseCount(landmarks ? landmarks.length : 0);
 
-    // Because we mirror-flipped, landmark X must also be flipped for overlay
     const st = stateRef.current || {};
-    const gId = st.selected_garment;
-    const g = garments.find((x) => x.id === gId);
-    const cache = g ? garmentImgCache.current[g.id] : null;
+    scene.updateFromPose(landmarks, worldLandmarks, vw, vh, FIT_SCALE[st.fit_mode || "regular"] || 1);
+    scene.render();
 
-    if (landmarks && g && cache?.ready) {
-      const LS = landmarks[11], RS = landmarks[12], LH = landmarks[23], RH = landmarks[24];
-      if (LS && RS && LH && RH) {
-        const scale = FIT_SCALE[st.fit_mode || "regular"] || 1;
-        // Get mirrored (flipped) points in canvas coords
-        const p = (lm) => [(1 - lm.x) * vw, lm.y * vh];
-        // Left/right shoulder swap because of mirror
-        const l_sh = p(RS), r_sh = p(LS), l_hip = p(RH), r_hip = p(LH);
-
-        // Anchors from garment metadata
-        const a = g.anchors;
-        // Note: In garment JSON, left_shoulder is on the LEFT side of the image (the model's right).
-        // We treat them as raw image points and map to detected points 1:1.
-        const src = [a.right_shoulder, a.left_shoulder, a.right_hip, a.left_hip];
-        // Apply fit scale by widening/narrowing hip-shoulder line about centre
-        const centerX = (l_sh[0] + r_sh[0] + l_hip[0] + r_hip[0]) / 4;
-        const centerY = (l_sh[1] + r_sh[1] + l_hip[1] + r_hip[1]) / 4;
-        const applyScale = (pt) => [centerX + (pt[0] - centerX) * scale, centerY + (pt[1] - centerY) * scale];
-        const dst = [applyScale(r_sh), applyScale(l_sh), applyScale(r_hip), applyScale(l_hip)];
-
-        const M = affineFromCorners(src, dst);
-        if (M) {
-          const source = cache.tintedCanvas || cache.img;
-          cx.save();
-          cx.globalAlpha = 0.98;
-          cx.setTransform(M.a, M.b, M.c, M.d, M.e, M.f);
-          cx.drawImage(source, 0, 0);
-          cx.setTransform(1, 0, 0, 1, 0, 0);
-          cx.restore();
-        }
-      }
-    }
-
-    // Skeleton overlay
-    if (landmarks && st.show_skeleton) drawSkeleton(cx, landmarks, vw, vh);
+    // Skeleton overlay on separate 2D canvas
+    const ox = overlay.getContext("2d");
+    ox.clearRect(0, 0, overlay.width, overlay.height);
+    if (landmarks && st.show_skeleton) drawSkeleton(ox, landmarks, overlay.width, overlay.height);
 
     rafRef.current = requestAnimationFrame(loop);
-  }, [garments]);
+  }, []);
 
   const drawSkeleton = (cx, lm, w, h) => {
+    // Video is CSS-mirrored, so overlay uses (1-x). Overlay canvas already sits above the mirrored video.
     const px = (i) => [(1 - lm[i].x) * w, lm[i].y * h];
     const conn = [
       [11, 12], [11, 23], [12, 24], [23, 24],
       [11, 13], [13, 15],
       [12, 14], [14, 16],
-      [23, 25], [25, 27], [27, 29], [29, 31],
-      [24, 26], [26, 28], [28, 30], [30, 32],
+      [23, 25], [25, 27],
+      [24, 26], [26, 28],
     ];
-    cx.save();
     cx.strokeStyle = "rgba(226,241,59,.85)";
-    cx.lineWidth = 3;
-    cx.lineCap = "round";
+    cx.lineWidth = 3; cx.lineCap = "round";
     conn.forEach(([a, b]) => {
       if (!lm[a] || !lm[b]) return;
       const [ax, ay] = px(a), [bx, by] = px(b);
@@ -218,7 +187,6 @@ export default function Mirror() {
       const [x, y] = px(i);
       cx.beginPath(); cx.arc(x, y, 4, 0, Math.PI * 2); cx.fill();
     });
-    cx.restore();
   };
 
   const copyLink = async () => {
@@ -229,9 +197,18 @@ export default function Mirror() {
   };
 
   const takeSnapshot = () => {
-    const canvas = canvasRef.current; if (!canvas) return;
-    const url = canvas.toDataURL("image/png");
-    setSnapshot(url);
+    // Composite: video (mirrored) + Three.js + skeleton overlay
+    const video = videoRef.current; const three = threeCanvasRef.current; const overlay = overlayCanvasRef.current;
+    if (!video || !three || !overlay) return;
+    const w = three.width, h = three.height;
+    const out = document.createElement("canvas"); out.width = w; out.height = h;
+    const cx = out.getContext("2d");
+    cx.save(); cx.translate(w, 0); cx.scale(-1, 1);
+    cx.drawImage(video, 0, 0, w, h);
+    cx.restore();
+    cx.drawImage(three, 0, 0, w, h);
+    cx.drawImage(overlay, 0, 0, w, h);
+    setSnapshot(out.toDataURL("image/png"));
   };
 
   const currentGarment = garments.find((g) => g.id === session?.selected_garment);
@@ -246,12 +223,13 @@ export default function Mirror() {
             <HomeIcon className="w-4 h-4" />
           </button>
           <div className="rounded-full border border-white/10 bg-obsidian/70 backdrop-blur-xl px-3 py-1.5 text-[10px] font-mono uppercase tracking-widest flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-acid pulse-dot" /> AURA FIT · Mirror
+            <span className="w-1.5 h-1.5 rounded-full bg-acid pulse-dot" /> AURA FIT · 3D Mirror
           </div>
         </div>
         <div className="flex items-center gap-2">
           <div data-testid="fps-counter" className="rounded-lg border border-white/10 bg-obsidian/70 backdrop-blur-xl px-3 py-1.5 text-[10px] font-mono">FPS {fps}</div>
           <div data-testid="pose-counter" className="rounded-lg border border-white/10 bg-obsidian/70 backdrop-blur-xl px-3 py-1.5 text-[10px] font-mono">POSE {poseCount}/33</div>
+          <div data-testid="model-status" className="rounded-lg border border-white/10 bg-obsidian/70 backdrop-blur-xl px-3 py-1.5 text-[10px] font-mono uppercase">{modelStatus}</div>
           <div data-testid="connection-status-pill" className={`rounded-full border px-3 py-1.5 text-[10px] font-mono uppercase tracking-widest backdrop-blur-xl flex items-center gap-2 ${phoneConnected ? "border-acid/60 bg-acid/10 text-acid" : "border-white/10 bg-obsidian/70 text-muted"}`}>
             {phoneConnected ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
             {phoneConnected ? (session?.phone_name || "Phone paired") : "Waiting for phone"}
@@ -259,11 +237,18 @@ export default function Mirror() {
         </div>
       </div>
 
-      {/* Video + canvas stage */}
-      <div className="relative w-full h-screen">
-        <video ref={videoRef} playsInline muted className="hidden" />
-        <canvas data-testid="webcam-ar-canvas" ref={canvasRef} className="absolute inset-0 w-full h-full object-cover bg-black" />
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/60" />
+      {/* Stage: video (mirrored via CSS) + three.js canvas + skeleton overlay stacked */}
+      <div ref={stageRef} className="relative w-full h-screen">
+        <video
+          ref={videoRef}
+          playsInline muted
+          className="absolute inset-0 w-full h-full object-cover bg-black"
+          style={{ transform: "scaleX(-1)" }}
+          data-testid="webcam-video"
+        />
+        <canvas ref={threeCanvasRef} data-testid="webcam-ar-canvas" className="absolute inset-0 w-full h-full pointer-events-none" />
+        <canvas ref={overlayCanvasRef} data-testid="skeleton-overlay-canvas" className="absolute inset-0 w-full h-full pointer-events-none" />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/60" />
 
         {cameraError && (
           <div className="absolute inset-0 grid place-items-center p-6">
@@ -276,7 +261,6 @@ export default function Mirror() {
           </div>
         )}
 
-        {/* QR Pairing Panel (floating, dismissible) */}
         <AnimatePresence>
           {showQrOverlay && session && (
             <motion.div
@@ -302,7 +286,7 @@ export default function Mirror() {
                   {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />} {copied ? "Copied" : "Link"}
                 </button>
               </div>
-              <p className="text-[11px] text-muted mt-3 leading-relaxed">Camera & tracking stay on this laptop. Nothing is uploaded.</p>
+              <p className="text-[11px] text-muted mt-3 leading-relaxed">Real 3D GLB shirt · rotates with your torso. Nothing is uploaded.</p>
             </motion.div>
           )}
         </AnimatePresence>
@@ -310,12 +294,9 @@ export default function Mirror() {
         {/* Bottom control bar */}
         <div className="absolute left-0 right-0 bottom-0 z-20 p-4">
           <div className="mx-auto max-w-5xl rounded-3xl border border-white/10 bg-obsidian/80 backdrop-blur-xxl p-4 flex items-center gap-3">
-            {/* Current garment badge */}
             <div className="hidden md:flex items-center gap-3 pr-3 border-r border-white/10 min-w-[220px]">
-              <div className="w-11 h-11 rounded-xl bg-white/10 grid place-items-center overflow-hidden" style={{ background: currentGarment?.tint || "rgba(255,255,255,.08)" }}>
-                {currentGarment && (
-                  <img src={`${process.env.REACT_APP_BACKEND_URL}${currentGarment.image}`} className="w-full h-full object-contain mix-blend-multiply" alt="" />
-                )}
+              <div className="w-11 h-11 rounded-xl grid place-items-center overflow-hidden" style={{ background: currentGarment?.tint || "rgba(255,255,255,.08)" }}>
+                <span className="text-[10px] font-mono">3D</span>
               </div>
               <div>
                 <div className="text-[10px] font-mono uppercase tracking-widest text-acid">NOW WEARING</div>
@@ -323,61 +304,31 @@ export default function Mirror() {
               </div>
             </div>
 
-            {/* Quick swap thumbnails */}
             <div className="flex-1 flex items-center gap-2 overflow-x-auto">
               {garments.map((g) => (
                 <button
                   key={g.id}
                   data-testid={`quick-garment-${g.id}`}
                   onClick={() => updateSession(token, { selected_garment: g.id, source: "mirror" }).then(setSession)}
-                  className={`flex-none w-12 h-12 rounded-xl border overflow-hidden grid place-items-center transition ${session?.selected_garment === g.id ? "border-acid shadow-glow" : "border-white/10 hover:border-white/30"}`}
-                  style={{ background: g.tint || "#fff" }}
+                  className={`flex-none w-12 h-12 rounded-xl border transition grid place-items-center text-[10px] font-mono ${session?.selected_garment === g.id ? "border-acid shadow-glow" : "border-white/10 hover:border-white/30"}`}
+                  style={{ background: g.tint || "#fff", color: pickReadableText(g.tint) }}
                   title={g.name}
                 >
-                  <img src={`${process.env.REACT_APP_BACKEND_URL}${g.image}`} alt="" className="w-full h-full object-contain mix-blend-multiply" />
+                  {g.id.slice(0, 2).toUpperCase()}
                 </button>
               ))}
             </div>
 
-            <button
-              data-testid="remove-garment-button"
-              onClick={() => updateSession(token, { clear_garment: true, source: "mirror" }).then(setSession)}
-              className="rounded-xl border border-white/10 px-3 py-2 text-xs text-white/80 hover:bg-white/5"
-            >
-              Clear
-            </button>
-            <button
-              data-testid="skeleton-toggle-button"
-              onClick={() => updateSession(token, { show_skeleton: !session?.show_skeleton, source: "mirror" }).then(setSession)}
-              className={`rounded-xl border px-3 py-2 text-xs transition ${session?.show_skeleton ? "border-acid/60 bg-acid/10 text-acid" : "border-white/10 text-white/80 hover:bg-white/5"}`}
-            >
-              Skeleton
-            </button>
-            <button
-              data-testid="show-qr-button"
-              onClick={() => setShowQrOverlay((s) => !s)}
-              className="rounded-xl border border-white/10 px-3 py-2 text-xs text-white/80 hover:bg-white/5 flex items-center gap-1"
-            >
-              <QrIcon className="w-3.5 h-3.5" /> QR
-            </button>
-            <button
-              data-testid="take-snapshot-button"
-              onClick={takeSnapshot}
-              className="rounded-xl bg-acid text-obsidian px-4 py-2 text-xs font-semibold hover:bg-acidhover flex items-center gap-1"
-            >
-              <Camera className="w-3.5 h-3.5" /> Capture
-            </button>
+            <button data-testid="remove-garment-button" onClick={() => updateSession(token, { clear_garment: true, source: "mirror" }).then(setSession)} className="rounded-xl border border-white/10 px-3 py-2 text-xs text-white/80 hover:bg-white/5">Clear</button>
+            <button data-testid="skeleton-toggle-button" onClick={() => updateSession(token, { show_skeleton: !session?.show_skeleton, source: "mirror" }).then(setSession)} className={`rounded-xl border px-3 py-2 text-xs transition ${session?.show_skeleton ? "border-acid/60 bg-acid/10 text-acid" : "border-white/10 text-white/80 hover:bg-white/5"}`}>Skeleton</button>
+            <button data-testid="show-qr-button" onClick={() => setShowQrOverlay((s) => !s)} className="rounded-xl border border-white/10 px-3 py-2 text-xs text-white/80 hover:bg-white/5 flex items-center gap-1"><QrIcon className="w-3.5 h-3.5" /> QR</button>
+            <button data-testid="take-snapshot-button" onClick={takeSnapshot} className="rounded-xl bg-acid text-obsidian px-4 py-2 text-xs font-semibold hover:bg-acidhover flex items-center gap-1"><Camera className="w-3.5 h-3.5" /> Capture</button>
           </div>
         </div>
 
-        {/* Snapshot modal */}
         <AnimatePresence>
           {snapshot && (
-            <motion.div
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="absolute inset-0 z-40 bg-obsidian/85 backdrop-blur-xl grid place-items-center p-6"
-              data-testid="snapshot-modal"
-            >
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-40 bg-obsidian/85 backdrop-blur-xl grid place-items-center p-6" data-testid="snapshot-modal">
               <motion.div initial={{ scale: .9 }} animate={{ scale: 1 }} className="max-w-3xl w-full rounded-3xl border border-white/10 bg-panel p-6">
                 <div className="flex items-center justify-between mb-4">
                   <div>
@@ -397,4 +348,13 @@ export default function Mirror() {
       </div>
     </div>
   );
+}
+
+// Pick readable text color (white/dark) for a background tint
+function pickReadableText(hex) {
+  if (!hex) return "#111";
+  const c = hex.replace("#", "");
+  const r = parseInt(c.substr(0, 2), 16), g = parseInt(c.substr(2, 2), 16), b = parseInt(c.substr(4, 2), 16);
+  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return lum > 0.6 ? "#111318" : "#ffffff";
 }

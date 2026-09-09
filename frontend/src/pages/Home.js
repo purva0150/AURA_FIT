@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowUpRight, ScanLine, Sparkles, Zap, Camera, Smartphone } from "lucide-react";
-import { createSession, fetchGarments, BACKEND_URL } from "../api";
+import { createSession, fetchGarments } from "../api";
 
 const features = [
   { icon: ScanLine, title: "33-Point Body Skeleton", copy: "Real-time MediaPipe pose tracking runs entirely in your browser — no upload, no lag." },
@@ -208,11 +208,15 @@ export default function Home() {
           </div>
           <div className="text-sm text-muted hidden md:block">{garments.length} pieces ready to fit</div>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
           {garments.map((g) => (
             <div key={g.id} data-testid="wardrobe-preview-card" className="group rounded-2xl border border-white/10 bg-surface/60 p-3 hover:border-acid/50 transition">
-              <div className="aspect-square rounded-xl bg-white/95 grid place-items-center overflow-hidden relative" style={{ background: g.tint || "#f2f2ee" }}>
-                <img src={`${BACKEND_URL}${g.image}`} alt={g.name} className="w-full h-full object-contain mix-blend-multiply" />
+              <div className="aspect-square rounded-xl grid place-items-center overflow-hidden relative"
+                   style={{ background: `linear-gradient(140deg, ${g.tint || "#eee"}, ${g.tint ? g.tint + "88" : "#ccc"})` }}>
+                <svg viewBox="0 0 100 110" className="w-3/5 h-3/5 opacity-90">
+                  <path fill="rgba(255,255,255,.9)" d="M20 20 L38 12 L50 22 L62 12 L80 20 L86 40 L74 44 L74 96 L26 96 L26 44 L14 40 Z" stroke="rgba(0,0,0,.15)" strokeWidth="1"/>
+                </svg>
+                <div className="absolute bottom-1 right-1 text-[8px] font-mono uppercase tracking-widest px-1.5 py-0.5 rounded bg-black/40 text-white">3D</div>
               </div>
               <div className="mt-3 text-sm font-medium truncate">{g.name}</div>
               <div className="text-[10px] font-mono uppercase tracking-widest text-muted mt-1">{g.color}</div>

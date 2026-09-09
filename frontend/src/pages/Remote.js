@@ -108,13 +108,15 @@ export default function Remote() {
         >
           <div className="aspect-[4/5] grid place-items-center relative" style={{ background: cardG?.tint ? `linear-gradient(160deg, ${cardG.tint}22, #0a0a10)` : "linear-gradient(160deg, #1a1d2b, #0a0a10)" }}>
             {cardG && (
-              <img
-                src={`${process.env.REACT_APP_BACKEND_URL}${cardG.image}`}
-                alt={cardG.name}
-                className="w-3/4 h-3/4 object-contain drop-shadow-2xl"
-                style={{ filter: cardG.tint ? `drop-shadow(0 20px 30px ${cardG.tint}44)` : "none",
-                         mixBlendMode: cardG.tint ? "normal" : "normal" }}
-              />
+              <div className="relative w-3/5 aspect-square grid place-items-center rounded-3xl"
+                   style={{ background: `radial-gradient(circle at 30% 30%, ${cardG.tint}, ${cardG.tint}66 60%, transparent 80%)`,
+                            boxShadow: `0 40px 90px -20px ${cardG.tint}66` }}>
+                <svg viewBox="0 0 100 110" className="w-4/5 h-4/5">
+                  <path fill={cardG.tint} d="M20 20 L38 12 L50 22 L62 12 L80 20 L86 40 L74 44 L74 96 L26 96 L26 44 L14 40 Z" stroke="rgba(255,255,255,.35)" strokeWidth="1.2"/>
+                  <path fill="rgba(0,0,0,.12)" d="M14 40 L26 44 L26 96 L20 96 Z"/>
+                </svg>
+                <div className="absolute bottom-3 right-3 text-[9px] font-mono uppercase tracking-widest px-2 py-1 rounded-full bg-black/50 text-white border border-white/20">GLB · 3D</div>
+              </div>
             )}
             <div className="absolute top-3 left-3 text-[10px] font-mono uppercase tracking-widest px-2 py-1 rounded-full bg-obsidian/70 border border-white/10">
               {cardG?.category || "—"}
@@ -159,8 +161,11 @@ export default function Remote() {
               onClick={() => { setActiveIdx(i); applyPatch({ selected_garment: g.id }); }}
               className={`rounded-2xl border p-2 text-left transition ${session?.selected_garment === g.id ? "border-acid shadow-glow" : "border-white/10 bg-surface/80 hover:border-white/30"}`}
             >
-              <div className="aspect-square rounded-xl grid place-items-center overflow-hidden" style={{ background: g.tint || "#f2f2ee" }}>
-                <img src={`${process.env.REACT_APP_BACKEND_URL}${g.image}`} alt="" className="w-full h-full object-contain mix-blend-multiply" />
+              <div className="aspect-square rounded-xl grid place-items-center overflow-hidden relative"
+                   style={{ background: `linear-gradient(140deg, ${g.tint}, ${g.tint}77)` }}>
+                <svg viewBox="0 0 100 110" className="w-3/5 h-3/5">
+                  <path fill="rgba(255,255,255,.92)" d="M20 20 L38 12 L50 22 L62 12 L80 20 L86 40 L74 44 L74 96 L26 96 L26 44 L14 40 Z" stroke="rgba(0,0,0,.12)" strokeWidth="1"/>
+                </svg>
               </div>
               <div className="text-[11px] font-medium mt-2 truncate">{g.name}</div>
               <div className="text-[9px] font-mono uppercase tracking-widest text-muted mt-0.5 truncate">{g.color}</div>
