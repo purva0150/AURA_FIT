@@ -1,0 +1,14 @@
+{
+  "garment_id": "white_oversized_tee",
+  "name": "White oversized T-shirt",
+  "dominant_color": "#eeeeee",
+  "category": "upper_body",
+  "angles": [
+    {
+      "anchors": "white_oversized_tee_000.json"
+    },
+    {
+      "anchors": "white_oversized_tee_180.json"
+    }
+  ]
+}

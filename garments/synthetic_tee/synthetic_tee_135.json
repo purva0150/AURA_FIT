@@ -1,40 +1,35 @@
 {
-  "garment_id": "synthetic_tee",
   "angle_deg": 135,
-  "view": "back45",
+  "view": "back_3q",
   "image": "synthetic_tee_135.png",
-  "source": {
-    "kind": "synthetic",
-    "generator": "backend/tools/make_synthetic.py"
-  },
   "anchors": {
+    "neck": [
+      260.0,
+      95.0
+    ],
     "left_shoulder": [
-      179.63,
-      150.0
+      153.93398282201787,
+      130.0
     ],
     "right_shoulder": [
-      332.37,
-      150.0
+      366.06601717798213,
+      130.0
     ],
     "left_hip": [
-      188.82,
-      540.0
+      175.1471862576143,
+      480.0
     ],
     "right_hip": [
-      323.18,
-      540.0
+      344.8528137423857,
+      480.0
     ],
     "left_elbow": [
-      132.28,
-      282.0
+      115.04310985675775,
+      270.0
     ],
     "right_elbow": [
-      379.72,
-      282.0
-    ],
-    "neck": [
-      256.0,
-      150.0
+      404.9568901432422,
+      270.0
     ]
   }
 }

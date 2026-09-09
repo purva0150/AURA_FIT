@@ -35,6 +35,8 @@ from .yaw import angular_dist, normalize_deg
 #: Anchor keys whose left/right sense must swap when an asset is mirrored.
 _MIRROR_SWAPS = (
     ("left_shoulder", "right_shoulder"),
+    ("left_chest", "right_chest"),
+    ("left_waist", "right_waist"),
     ("left_elbow", "right_elbow"),
     ("left_hip", "right_hip"),
     ("left_wrist", "right_wrist"),
@@ -49,6 +51,7 @@ class GarmentAngle:
     view: str
     image_path: Optional[str]
     anchors: Dict[str, np.ndarray]
+    fit: Dict[str, float] = field(default_factory=dict)
     mirrored_from: Optional[float] = None
     _image: Optional[np.ndarray] = field(default=None, repr=False)
 
@@ -95,6 +98,7 @@ class GarmentAngle:
             view=f"{self.view}_mirrored",
             image_path=None,
             anchors=flipped,
+            fit=dict(self.fit),
             mirrored_from=self.angle_deg,
             _image=img,
         )
@@ -217,6 +221,12 @@ class GarmentSet:
                 hi_deg = avail[(i + 1) % len(avail)]
 
         span = (hi_deg - lo_deg) % 360.0
+        # Do not dissolve halfway around the body when only front and back
+        # photographs exist. That blend creates a translucent/twisted shirt;
+        # use the closest real view until a side asset is supplied.
+        if span > 90.0:
+            nearest = self.nearest(yaw)
+            return nearest, nearest, 0.0
         weight = 0.0 if span < 1e-9 else ((yaw - lo_deg) % 360.0) / span
         return self.angles[lo_deg], self.angles[hi_deg], float(np.clip(weight, 0.0, 1.0))
 
@@ -251,6 +261,11 @@ def _load_angle_json(path: str, root: str) -> Optional[GarmentAngle]:
         view=payload.get("view", ""),
         image_path=image_path,
         anchors=anchors,
+        fit={
+            str(key): float(value)
+            for key, value in payload.get("fit", {}).items()
+            if isinstance(value, (int, float))
+        },
     )
 
 

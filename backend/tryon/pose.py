@@ -47,6 +47,10 @@ GARMENT_LANDMARKS = (
     "left_hip",
     "right_hip",
     "neck",
+    "left_chest",
+    "right_chest",
+    "left_waist",
+    "right_waist",
 )
 
 DEFAULT_VISIBILITY = 0.5

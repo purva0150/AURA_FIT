@@ -1,6 +1,9 @@
 flask==3.0.3
-opencv-python==4.10.0.84
+# TPS lives in OpenCV's contrib build. Installing opencv-python alongside it
+# can make cv2 resolve to the wrong wheel, so keep only the contrib package.
+opencv-contrib-python==4.10.0.84
 mediapipe==0.10.14
 numpy==1.26.4
 qrcode==7.4.2
 pillow==10.4.0
+pytest==8.3.5

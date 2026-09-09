@@ -1,0 +1,26 @@
+{
+  "garment_id": "white_oversized_tee",
+  "angle_deg": 180,
+  "view": "back_estimated",
+  "image": "white_oversized_tee_000.png",
+  "anchors": {
+    "neck": [250.0, 127.5],
+    "left_shoulder": [140.0, 127.5],
+    "right_shoulder": [360.0, 127.5],
+    "left_elbow": [55.0, 267.5],
+    "right_elbow": [430.0, 267.5],
+    "left_hip": [147.5, 437.5],
+    "right_hip": [342.5, 437.5],
+    "left_chest": [155.0, 225.0],
+    "right_chest": [345.0, 225.0],
+    "left_waist": [160.0, 335.0],
+    "right_waist": [340.0, 335.0]
+  },
+  "fit": {
+    "hem_extension": 0.1,
+    "hem_width_ratio": 0.92,
+    "sleeve_length_ratio": 0.52,
+    "chest_width_ratio": 0.94,
+    "waist_width_ratio": 0.89
+  }
+}

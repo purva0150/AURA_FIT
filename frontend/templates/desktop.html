@@ -1,0 +1,11 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mirror — Virtual Try-On</title><link rel="stylesheet" href="{{ url_for('static',filename='styles.css') }}"></head>
+<body class="desktop" data-token="{{ token }}"><main class="room">
+<section class="mirror"><img class="feed" src="/video-feed" alt="Live webcam body tracking"><div class="shade"></div>
+<header class="top"><div class="brand"><b>M</b><span>Mirror</span></div><div id="connection" class="status"><i></i><span>Waiting for phone</span></div></header>
+<div class="tracking"><i></i><div><strong>Body tracking active</strong><small>Keep your shoulders and hips visible</small></div></div>
+<section id="pair" class="pair"><em>REMOTE FITTING ROOM</em><h1>Scan to control the mirror</h1><p>Browse garments from your phone while the laptop tracks your fit.</p><div class="qr"><img src="/qr" alt="Pairing QR code"></div><small>Phone and laptop must use the same Wi-Fi</small></section>
+<div id="toast" class="toast" role="status"></div></section>
+<aside class="wardrobe"><div class="wardrobe-title"><div><em>LIVE WARDROBE</em><h2>Choose a look</h2></div><button id="skeleton" class="skeleton active" title="Toggle skeleton" aria-label="Toggle skeleton">⌁</button></div><p>Select here or use the paired phone.</p>
+<div class="garments">{% for garment in garments %}<button class="garment" data-garment="{{ garment.id }}"><span class="thumb"><img src="{{ garment.thumbnail }}" alt=""></span><span><strong>{{ garment.name }}</strong><small>Tap to try on</small></span><b>✓</b></button>{% endfor %}</div>
+<button id="clear" class="clear">Remove garment</button><footer><i></i>Camera processing stays on this laptop</footer></aside>
+</main><script src="{{ url_for('static',filename='desktop.js') }}" defer></script></body></html>

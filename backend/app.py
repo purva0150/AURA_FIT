@@ -1,124 +1,205 @@
-"""
-Milestone 1: Flask backend
-- Serves a QR code that points the mobile browser to the garment selection page
-- Receives the user's garment selection from mobile and stores it for the desktop client
-"""
+"""Paired desktop/mobile virtual try-on. Run: python backend/app.py"""
+from __future__ import annotations
 
-import io
-import qrcode
-from flask import Flask, jsonify, request, send_file, render_template_string
+import io, os, secrets, socket, sys, threading, time
+from pathlib import Path
+from typing import Optional
+from urllib.parse import urlencode
+import cv2, numpy as np, qrcode
+from flask import Flask, Response, abort, jsonify, render_template, request, send_file
 
-app = Flask(__name__)
+BACKEND_DIR = Path(__file__).resolve().parent
+REPO_ROOT = BACKEND_DIR.parent
+FRONTEND_DIR = REPO_ROOT / "frontend"
+GARMENTS_DIR = REPO_ROOT / "garments"
+sys.path.insert(0, str(BACKEND_DIR))
+from tryon.garment import GarmentSet, discover_garments  # noqa: E402
+from tryon.pose import PoseEstimator, draw_skeleton  # noqa: E402
+from tryon_live import LiveTryOn  # noqa: E402
 
-# In-memory store for the demo. Replace with a real session/DB layer later.
-STATE = {"selected_garment": None}
+app = Flask(__name__, template_folder=str(FRONTEND_DIR / "templates"), static_folder=str(FRONTEND_DIR / "static"))
+SESSION_TOKEN = secrets.token_urlsafe(18)
+STATE_LOCK = threading.RLock()
+STATE = {"selected_garment": None, "phone_name": None, "last_phone_seen": 0.0,
+         "show_skeleton": True, "view_mode": "auto", "fit_mode": "regular"}
+FIT_SCALES = {"fitted": 0.94, "regular": 1.0, "relaxed": 1.06}
 
-# Placeholder catalogue - replace with real data pulled from garments/ once populated
-GARMENTS = [
-    {"id": "shirt1", "name": "Blue Casual Shirt"},
-    {"id": "shirt2", "name": "White Formal Shirt"},
-    {"id": "jacket1", "name": "Black Jacket"},
-]
+def catalogue() -> list[GarmentSet]:
+    return discover_garments(str(GARMENTS_DIR))
 
-MOBILE_PAGE = """
-<!doctype html>
-<title>Select a Garment</title>
-<style>
-  body { font-family: sans-serif; max-width: 400px; margin: 40px auto; padding: 0 16px; }
-  h2 { text-align: center; }
-  ul { list-style: none; padding: 0; }
-  li { margin: 10px 0; }
-  a { display: block; padding: 14px; text-align: center; background: #2f5fa8;
-      color: white; text-decoration: none; border-radius: 8px; font-size: 16px; }
-  a:active { background: #244a85; }
-  #confirm { text-align: center; color: #2f5fa8; font-weight: bold; }
-</style>
-<h2>Choose a garment to try on</h2>
-<ul>
-{% for g in garments %}
-  <li><a href="/select/{{ g.id }}">{{ g.name }}</a></li>
-{% endfor %}
-</ul>
-<p id="confirm"></p>
-"""
+def catalogue_json() -> list[dict]:
+    return [{"id": g.garment_id, "name": g.name, "color": g.dominant_color,
+             "thumbnail": f"/api/garments/{g.garment_id}/thumbnail"} for g in catalogue()]
 
-SELECT_CONFIRM_PAGE = """
-<!doctype html>
-<title>Selected</title>
-<body style="font-family: sans-serif; text-align: center; margin-top: 60px;">
-  <h2>Selected: {{ name }}</h2>
-  <p>Look at the desktop screen now.</p>
-</body>
-"""
+def local_ip() -> str:
+    if os.environ.get("VTO_PUBLIC_HOST"): return os.environ["VTO_PUBLIC_HOST"]
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        sock.connect(("8.8.8.8", 80)); return sock.getsockname()[0]
+    except OSError:
+        try: return socket.gethostbyname(socket.gethostname())
+        except OSError: return "127.0.0.1"
+    finally: sock.close()
 
-DESKTOP_PAGE = """
-<!doctype html>
-<title>Virtual Try-On - Desktop</title>
-<style>
-  body { font-family: sans-serif; text-align: center; margin-top: 40px; }
-  #qr { border: 1px solid #ddd; padding: 12px; display: inline-block; }
-  #status { font-size: 20px; margin-top: 24px; }
-  #garment-name { color: #2f5fa8; font-weight: bold; }
-</style>
-<h1>Virtual Try-On</h1>
-<p>Scan this QR code with your phone to pick a garment</p>
-<div id="qr"><img src="/qr" alt="QR code" width="220" height="220"></div>
-<div id="status">Waiting for garment selection&hellip;</div>
+def valid_token(value: Optional[str]) -> bool:
+    return bool(value) and secrets.compare_digest(value, SESSION_TOKEN)
 
-<script>
-  async function poll() {
-    try {
-      const res = await fetch('/api/selection');
-      const data = await res.json();
-      const statusEl = document.getElementById('status');
-      if (data.selected_garment) {
-        statusEl.innerHTML = 'Selected garment: <span id="garment-name">' + data.selected_garment + '</span>';
-      }
-    } catch (e) {
-      // server not reachable yet, keep polling
-    }
-  }
-  setInterval(poll, 1500);
-  poll();
-</script>
-"""
+def state_json() -> dict:
+    with STATE_LOCK:
+        connected = time.time() - float(STATE["last_phone_seen"]) < 8.0
+        return {"connected": connected, "phone_name": STATE["phone_name"] if connected else None,
+                "selected_garment": STATE["selected_garment"], "show_skeleton": STATE["show_skeleton"],
+                "view_mode": STATE["view_mode"], "fit_mode": STATE["fit_mode"]}
 
+class CameraEngine:
+    def __init__(self) -> None:
+        self.garments = catalogue()
+        self.tryon = LiveTryOn(self.garments, use_tps=True) if self.garments else None
+        self.condition = threading.Condition()
+        self.latest_jpeg: Optional[bytes] = None
+        self.sequence = 0
+        self.started = False
 
-@app.route("/")
-def desktop_home():
-    return render_template_string(DESKTOP_PAGE)
+    def select(self, garment_id: Optional[str]) -> bool:
+        if not garment_id or self.tryon is None: return False
+        for index, garment in enumerate(self.garments):
+            if garment.garment_id == garment_id:
+                if self.tryon.index != index:
+                    self.tryon.index = index; self.tryon.smoother.reset()
+                return True
+        return False
 
+    def start(self) -> None:
+        with self.condition:
+            if self.started: return
+            self.started = True
+            threading.Thread(target=self._capture_loop, name="vto-camera", daemon=True).start()
 
-@app.route("/qr")
-def get_qr():
-    # In production, replace with your machine's LAN IP so a phone can reach it
-    mobile_url = request.host_url + "mobile"
-    img = qrcode.make(mobile_url)
-    buf = io.BytesIO()
-    img.save(buf, format="PNG")
-    buf.seek(0)
-    return send_file(buf, mimetype="image/png")
+    def _publish(self, frame: "cv2.typing.MatLike") -> None:
+        ok, encoded = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 86])
+        if not ok: return
+        with self.condition:
+            self.latest_jpeg = encoded.tobytes(); self.sequence += 1; self.condition.notify_all()
 
+    def _capture_loop(self) -> None:
+        backend = cv2.CAP_DSHOW if os.name == "nt" else cv2.CAP_ANY
+        cap = cv2.VideoCapture(int(os.environ.get("VTO_CAMERA", "0")), backend)
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280); cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720); cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        if not cap.isOpened():
+            error = np.zeros((720, 1280, 3), dtype=np.uint8)
+            cv2.putText(error, "Camera unavailable", (420, 350), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (240,240,240), 2)
+            self._publish(error); return
+        try:
+            with PoseEstimator(segmentation=True, model_complexity=1) as estimator:
+                while True:
+                    ok, frame = cap.read()
+                    if not ok: time.sleep(.02); continue
+                    frame = cv2.flip(frame, 1); pose = estimator.process(frame)
+                    with STATE_LOCK:
+                        garment_id, skeleton = STATE["selected_garment"], bool(STATE["show_skeleton"])
+                        view_mode, fit_mode = STATE["view_mode"], STATE["fit_mode"]
+                    has_garment = self.select(garment_id)
+                    output = self.tryon.process(frame, pose, view_mode=view_mode,
+                                                fit_scale=FIT_SCALES[fit_mode]) if pose is not None and has_garment and self.tryon else frame.copy()
+                    if pose is not None and (skeleton or not has_garment): draw_skeleton(output, pose, color=(63, 238, 171))
+                    self._publish(output)
+        finally:
+            cap.release()
 
-@app.route("/mobile")
-def mobile_page():
-    return render_template_string(MOBILE_PAGE, garments=GARMENTS)
+    def frames(self):
+        self.start(); seen = -1
+        while True:
+            with self.condition:
+                self.condition.wait_for(lambda: self.sequence != seen, timeout=2.0)
+                if self.latest_jpeg is None: continue
+                seen, payload = self.sequence, self.latest_jpeg
+            yield b"--frame\r\nContent-Type: image/jpeg\r\nCache-Control: no-store\r\n\r\n" + payload + b"\r\n"
 
+CAMERA = CameraEngine()
 
-@app.route("/select/<garment_id>")
-def select_garment(garment_id):
-    STATE["selected_garment"] = garment_id
-    match = next((g for g in GARMENTS if g["id"] == garment_id), None)
-    name = match["name"] if match else garment_id
-    return render_template_string(SELECT_CONFIRM_PAGE, name=name)
+@app.get("/")
+def desktop_home(): return render_template("desktop.html", token=SESSION_TOKEN, garments=catalogue_json())
 
+@app.get("/mobile")
+def mobile_home():
+    token = request.args.get("session", "")
+    if not valid_token(token): return render_template("invalid_session.html"), 403
+    return render_template("mobile.html", token=token, garments=catalogue_json())
 
-@app.route("/api/selection")
-def get_selection():
-    # Desktop client polls this to know what the user picked on mobile
-    return jsonify(STATE)
+@app.get("/qr")
+def qr_code():
+    url = f"http://{local_ip()}:5000/mobile?{urlencode({'session': SESSION_TOKEN})}"
+    qr = qrcode.QRCode(box_size=9, border=2); qr.add_data(url); qr.make(fit=True)
+    image = qr.make_image(fill_color="#101114", back_color="#ffffff")
+    buffer = io.BytesIO(); image.save(buffer, format="PNG"); buffer.seek(0)
+    return send_file(buffer, mimetype="image/png", max_age=0)
 
+@app.get("/video-feed")
+def video_feed(): return Response(CAMERA.frames(), mimetype="multipart/x-mixed-replace; boundary=frame")
+
+@app.get("/api/garments/<garment_id>/thumbnail")
+def garment_thumbnail(garment_id: str):
+    garment = next((g for g in catalogue() if g.garment_id == garment_id), None)
+    if garment is None: abort(404)
+    angle = garment.nearest(0)
+    if not angle.image_path: abort(404)
+    return send_file(angle.image_path, mimetype="image/png", max_age=3600)
+
+@app.get("/api/state")
+def get_state(): return jsonify(state_json())
+
+@app.post("/api/connect")
+def connect_phone():
+    data = request.get_json(silent=True) or {}
+    if not valid_token(data.get("session")): abort(403)
+    with STATE_LOCK:
+        STATE["phone_name"] = str(data.get("device") or "Mobile controller")[:50]; STATE["last_phone_seen"] = time.time()
+    return jsonify({"ok": True, **state_json()})
+
+@app.post("/api/select")
+def select_garment():
+    data = request.get_json(silent=True) or {}
+    if not valid_token(data.get("session")): abort(403)
+    garment_id = data.get("garment_id")
+    if garment_id is not None and garment_id not in {g["id"] for g in catalogue_json()}:
+        return jsonify({"ok": False, "error": "Unknown garment"}), 400
+    with STATE_LOCK:
+        STATE["selected_garment"] = garment_id
+        if data.get("source") == "mobile": STATE["last_phone_seen"] = time.time()
+    return jsonify({"ok": True, **state_json()})
+
+@app.post("/api/skeleton")
+def toggle_skeleton():
+    data = request.get_json(silent=True) or {}
+    if not valid_token(data.get("session")): abort(403)
+    with STATE_LOCK:
+        STATE["show_skeleton"] = bool(data.get("enabled"))
+        if data.get("source") == "mobile": STATE["last_phone_seen"] = time.time()
+    return jsonify({"ok": True, **state_json()})
+
+@app.post("/api/view")
+def select_view():
+    data = request.get_json(silent=True) or {}
+    if not valid_token(data.get("session")): abort(403)
+    mode = str(data.get("mode", "auto"))
+    if mode not in {"auto", "front", "back"}: return jsonify({"ok": False, "error": "Invalid view"}), 400
+    with STATE_LOCK:
+        STATE["view_mode"] = mode
+        if data.get("source") == "mobile": STATE["last_phone_seen"] = time.time()
+    return jsonify({"ok": True, **state_json()})
+
+@app.post("/api/fit")
+def select_fit():
+    data = request.get_json(silent=True) or {}
+    if not valid_token(data.get("session")): abort(403)
+    mode = str(data.get("mode", "regular"))
+    if mode not in FIT_SCALES: return jsonify({"ok": False, "error": "Invalid fit"}), 400
+    with STATE_LOCK:
+        STATE["fit_mode"] = mode
+        if data.get("source") == "mobile": STATE["last_phone_seen"] = time.time()
+    return jsonify({"ok": True, **state_json()})
 
 if __name__ == "__main__":
-    # host="0.0.0.0" so it's reachable from a phone on the same network
-    app.run(host="0.0.0.0", port=5000, debug=True, use_reloader=False)
+    print("\nVirtual Try-On\nLaptop: http://127.0.0.1:5000")
+    print(f"Phone network: http://{local_ip()}:5000\nKeep both devices on the same Wi-Fi.\n")
+    app.run(host="0.0.0.0", port=5000, debug=False, threaded=True, use_reloader=False)
