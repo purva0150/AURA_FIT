@@ -1,6 +1,7 @@
 import axios from "axios";
 
-const BACKEND = process.env.REACT_APP_BACKEND_URL || "";
+const BACKEND = process.env.REACT_APP_BACKEND_URL;
+if (!BACKEND) throw new Error("REACT_APP_BACKEND_URL is required");
 export const API = axios.create({ baseURL: `${BACKEND}/api` });
 export const BACKEND_URL = BACKEND;
 

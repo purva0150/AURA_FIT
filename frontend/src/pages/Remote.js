@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Wifi, Shirt, Sparkles, Circle, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { fetchGarments, getSession, updateSession, heartbeat } from "../api";
+import { ClothToggle } from "../components/ClothToggle";
 
 const FITS = [
   { key: "fitted", label: "Fitted", copy: "Snug" },
@@ -23,34 +24,40 @@ export default function Remote() {
   const [session, setSession] = useState(null);
   const [error, setError] = useState(null);
   const [activeIdx, setActiveIdx] = useState(0);
+  const [controlError, setControlError] = useState(null);
 
   useEffect(() => { if (!token) nav("/"); }, [token, nav]);
 
   useEffect(() => {
     if (!token) return;
-    fetchGarments().then(setGarments);
+    fetchGarments().then(setGarments).catch(() => setControlError("Wardrobe unavailable."));
     getSession(token).then(setSession).catch(() => setError("Session expired. Ask the laptop to show a new QR."));
   }, [token]);
 
   // Heartbeat every 3s (keeps phone_connected true)
   useEffect(() => {
-    if (!token) return;
+    if (!token || error) return;
     const name = /iPhone|iPad|iPod/i.test(navigator.userAgent) ? "iPhone" :
       /Android/i.test(navigator.userAgent) ? "Android phone" : "Mobile controller";
-    const beat = () => heartbeat(token, name).then(setSession).catch(() => {});
+    const beat = () => heartbeat(token, name).then((s) => setSession((prev) => (prev?.version ?? 0) > s.version ? prev : s)).catch(() => {});
     beat();
     const iv = setInterval(beat, 3000);
     return () => clearInterval(iv);
-  }, [token]);
+  }, [token, error]);
 
   const applyPatch = async (patch) => {
-    try { setSession(await updateSession(token, { ...patch, source: "phone" })); } catch {}
+    try {
+      const s = await updateSession(token, { ...patch, source: "phone" });
+      setSession((prev) => (prev?.version ?? 0) > s.version ? prev : s); setControlError(null);
+    } catch { setControlError("Could not update the mirror. Please try again."); }
   };
 
   const currentIdx = useMemo(() => {
     if (!session?.selected_garment) return -1;
     return garments.findIndex((g) => g.id === session.selected_garment);
   }, [garments, session]);
+
+  useEffect(() => { if (currentIdx >= 0) setActiveIdx(currentIdx); }, [currentIdx]);
 
   const swipe = (dir) => {
     if (!garments.length) return;
@@ -64,11 +71,12 @@ export default function Remote() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-obsidian grid place-items-center p-6 text-center">
+      <div data-testid="remote-session-error" role="alert" className="min-h-screen bg-obsidian grid place-items-center p-6 text-center">
         <div className="max-w-sm rounded-3xl border border-white/10 bg-panel p-8">
           <div className="w-10 h-10 rounded-xl bg-acid text-obsidian grid place-items-center font-display font-black mx-auto mb-3">AF</div>
           <div className="font-display font-bold text-2xl">Session expired</div>
           <p className="text-muted mt-2 text-sm">{error}</p>
+          <button data-testid="remote-error-home" onClick={() => nav("/")} className="mt-4 text-acid">Back home</button>
         </div>
       </div>
     );
@@ -94,7 +102,7 @@ export default function Remote() {
       <div className="px-5">
         <div className="text-[10px] font-mono uppercase tracking-widest text-acid">Your Remote Wardrobe</div>
         <h1 className="font-display font-black text-4xl tracking-tight leading-[1] mt-2">What do you want <span className="italic text-acid">to try?</span></h1>
-        <p className="text-muted text-sm mt-3">Every tap reflects instantly on the mirror.</p>
+        {controlError && <p data-testid="remote-control-error" role="alert" className="text-red-300 text-sm mt-3">{controlError}</p>}
       </div>
 
       {/* Hero card / swipe stack */}
@@ -128,10 +136,10 @@ export default function Remote() {
               <ChevronRight className="w-5 h-5" />
             </button>
           </div>
-          <div className="p-4 flex items-center justify-between">
-            <div>
-              <div className="font-display font-bold text-lg leading-tight">{cardG?.name || "Pick something"}</div>
-              <div className="text-[11px] font-mono uppercase tracking-widest text-muted mt-0.5">{cardG?.color || "—"}</div>
+          <div className="p-4 flex flex-wrap gap-3 items-center justify-between">
+            <div className="min-w-0 flex-1">
+              <div data-testid="remote-current-garment-name" className="font-display font-bold text-lg leading-tight">{cardG?.name || "Pick something"}</div>
+              <div data-testid="remote-current-garment-color" className="text-[11px] font-mono uppercase tracking-widest text-muted mt-0.5">{cardG?.color || "—"}</div>
             </div>
             <button
               data-testid="apply-current-garment"
@@ -157,7 +165,7 @@ export default function Remote() {
           {garments.map((g, i) => (
             <button
               key={g.id}
-              data-testid="garment-card-item"
+              data-testid={`garment-card-${g.id}`}
               onClick={() => { setActiveIdx(i); applyPatch({ selected_garment: g.id }); }}
               className={`rounded-2xl border p-2 text-left transition ${session?.selected_garment === g.id ? "border-acid shadow-glow" : "border-white/10 bg-surface/80 hover:border-white/30"}`}
             >
@@ -176,6 +184,7 @@ export default function Remote() {
 
       {/* Controls */}
       <div className="px-5 mt-8 space-y-4">
+        <ClothToggle device="phone" enabled={session?.cloth_enabled !== false} onChange={(cloth_enabled) => applyPatch({ cloth_enabled })} />
         <div className="rounded-2xl border border-white/10 bg-surface/80 p-4">
           <div className="flex items-center gap-2 mb-3">
             <Shirt className="w-4 h-4 text-acid" />

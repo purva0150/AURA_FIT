@@ -1,0 +1,12 @@
+{
+  "short_name": "AURA FIT",
+  "name": "AURA FIT — Virtual Fitting Room",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#090A0F",
+  "theme_color": "#090A0F",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

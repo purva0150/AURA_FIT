@@ -1,0 +1,25 @@
+{
+  "date": "2026-09-09",
+  "case_type": "feature addition and regression fixes",
+  "backend": {"passed": 13, "failed": 0},
+  "physics": {"native_harness": "PASS", "jest_passed": 6, "jest_failed": 0, "pin_drift": 0, "settle_delta": 0.0007730354528071368, "motion_delta": 0.014388997053251156},
+  "ui": {"mirror_remote_sync": "PASS from iteration_3", "responsive_widths": [320, 768, 1024, 1440], "real_worker_boot_cycles": 2, "pixel_verified_captures": 3, "white_garment_pixel_counts": [102197, 102197, 102197], "clear_garment": "PASS"},
+  "build": "PASS with existing MediaPipe dependency/source-map warnings",
+  "lint": "PASS: repository ESLint9 flat config and local CRA ESLint8 checks",
+  "resolved_findings": [
+    "Main-thread synchronous MediaPipe stall: inference isolated to CPU worker",
+    "Physics fixture not normalized: shared production normalization used",
+    "Jest/Three ESM mismatch: dedicated runnable test configuration",
+    "Unused embedded texture load errors on navigation: cancellable untextured loader",
+    "Slow-frame tracking disappearance: bounded worker-result grace window",
+    "Capture/render pressure: capture queued after normal render rather than extra render"
+  ],
+  "remaining_limitations": [
+    "Real-camera fit and hardware frame rate need user validation",
+    "Software-GPU ReadPixels warnings remain during camera processing; no fixed FPS guarantee",
+    "Cloth simulation uses approximate torso colliders, no self-collision or hand occlusion"
+  ],
+  "mocked_app_apis": false,
+  "test_only_mocks": "Synthetic camera and deterministic worker pose fixtures for controlled WebGL tests; real worker boot tested separately",
+  "final_console_log": "/root/.emergent/automation_output/20260909_200714/console_20260909_200714.log"
+}

@@ -1,0 +1,17 @@
+{
+  "files": {
+    "main.css": "/static/css/main.3edd3469.css",
+    "main.js": "/static/js/main.9b3acb13.js",
+    "aura-pose.js": "/static/js/aura-pose.9f56abcf.chunk.js",
+    "static/js/277.7e5a1f9e.chunk.js": "/static/js/277.7e5a1f9e.chunk.js",
+    "index.html": "/index.html",
+    "main.3edd3469.css.map": "/static/css/main.3edd3469.css.map",
+    "main.9b3acb13.js.map": "/static/js/main.9b3acb13.js.map",
+    "aura-pose.9f56abcf.chunk.js.map": "/static/js/aura-pose.9f56abcf.chunk.js.map",
+    "277.7e5a1f9e.chunk.js.map": "/static/js/277.7e5a1f9e.chunk.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.3edd3469.css",
+    "static/js/main.9b3acb13.js"
+  ]
+}

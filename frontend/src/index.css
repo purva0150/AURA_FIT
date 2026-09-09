@@ -57,3 +57,16 @@ input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none; appearance: none; width: 18px; height: 18px; border-radius: 999px;
   background: #E2F13B; box-shadow: 0 0 0 4px rgba(226,241,59,.15); cursor: pointer;
 }
+
+.mirror-stage { height: 100dvh; }
+@media (max-width: 1023px) {
+  .mirror-wardrobe { flex-basis: 100%; }
+  .mirror-controls > .hidden { display: none; }
+}
+@media (max-width: 639px) {
+  .mirror-hud { align-content: flex-start; }
+  .mirror-qr { top: 9.5rem; right: 1rem; width: 210px; padding: 12px; }
+  .mirror-qr img { max-height: 130px; width: auto; }
+  .mirror-controls { border-radius: 16px; gap: 6px; }
+  .mirror-controls > button { padding-left: 9px; padding-right: 9px; }
+}

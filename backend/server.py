@@ -18,7 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 from motor.motor_asyncio import AsyncIOMotorClient
-from pydantic import BaseModel, BeforeValidator, Field
+from pydantic import BaseModel, BeforeValidator, Field, StrictBool
 
 ROOT = Path(__file__).parent
 load_dotenv(ROOT / ".env")
@@ -61,6 +61,7 @@ class SessionState(BaseModel):
     fit_mode: str = "regular"          # fitted | regular | relaxed
     view_mode: str = "auto"            # auto | front | back
     show_skeleton: bool = True
+    cloth_enabled: bool = True
     phone_name: Optional[str] = None
     phone_connected: bool = False
     last_phone_seen: float = 0.0
@@ -73,6 +74,7 @@ class SessionUpdate(BaseModel):
     fit_mode: Optional[str] = None
     view_mode: Optional[str] = None
     show_skeleton: Optional[bool] = None
+    cloth_enabled: Optional[StrictBool] = None
     phone_name: Optional[str] = None
     source: Optional[str] = "phone"    # phone | mirror
     clear_garment: bool = False
@@ -104,6 +106,7 @@ def _serialize(doc: dict) -> dict:
     d = dict(doc)
     d["_id"] = str(d.pop("_id"))
     d["phone_connected"] = (time.time() - float(d.get("last_phone_seen", 0))) < 10.0
+    d.setdefault("cloth_enabled", True)
     return d
 
 
@@ -173,6 +176,8 @@ async def update_session(token: str, payload: SessionUpdate) -> dict:
         updates["view_mode"] = payload.view_mode
     if payload.show_skeleton is not None:
         updates["show_skeleton"] = bool(payload.show_skeleton)
+    if payload.cloth_enabled is not None:
+        updates["cloth_enabled"] = payload.cloth_enabled
     if payload.source == "phone":
         updates["last_phone_seen"] = time.time()
         updates["phone_connected"] = True
