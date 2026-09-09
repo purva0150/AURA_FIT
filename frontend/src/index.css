@@ -1,0 +1,59 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root { height: 100%; }
+body {
+  margin: 0;
+  background: #090A0F;
+  color: #F4F4F6;
+  font-family: 'Plus Jakarta Sans', 'Manrope', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: none;
+}
+::selection { background: #E2F13B; color: #090A0F; }
+
+/* Distinct scrollbar */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,.08); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(226,241,59,.35); }
+
+/* Grain overlay utility */
+.grain::before {
+  content: "";
+  position: absolute; inset: 0; pointer-events: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='.42'/></svg>");
+  opacity: .06; mix-blend-mode: overlay;
+}
+
+/* Animated gradient border */
+.ring-acid {
+  position: relative;
+}
+.ring-acid::after {
+  content: ""; position: absolute; inset: -1px; border-radius: inherit; pointer-events: none;
+  background: linear-gradient(120deg, rgba(226,241,59,.6), transparent 40%, rgba(226,241,59,.25) 90%);
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude; padding: 1px;
+}
+
+/* Marquee */
+@keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.marquee-track { animation: marquee 32s linear infinite; }
+
+/* Pulse dot */
+@keyframes pulseDot { 0%,100% { transform: scale(1); opacity:1;} 50% { transform: scale(1.5); opacity:.6;} }
+.pulse-dot { animation: pulseDot 1.6s ease-in-out infinite; }
+
+/* Skeleton animation */
+@keyframes skeletonPulse { 0%,100% { opacity: .55; } 50% { opacity: 1; } }
+.skeleton-pulse { animation: skeletonPulse 2.4s ease-in-out infinite; }
+
+/* Range slider fashion look */
+input[type="range"] { -webkit-appearance: none; appearance: none; height: 4px; background: rgba(255,255,255,.1); border-radius: 999px; }
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; width: 18px; height: 18px; border-radius: 999px;
+  background: #E2F13B; box-shadow: 0 0 0 4px rgba(226,241,59,.15); cursor: pointer;
+}

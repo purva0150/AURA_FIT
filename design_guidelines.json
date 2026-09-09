@@ -1,0 +1,150 @@
+{
+  "project_name": "AURA FIT - Virtual AR Fitting Room & Mobile Remote",
+  "archetype": "ARCHETYPE 7: ELECTRIC & NEON / ARCHETYPE 5: LUXURY EDITORIAL (High Fashion Tech Mirror)",
+  "design_philosophy": {
+    "core_concept": "Editorial Runway meets AR Cyber-HUD. High contrast dark obsidian studio background paired with vibrant acid-gold & cyber-lime accents, tactile glassmorphism panels, raw technical typography, and fluid AR body-mesh controls.",
+    "anti_patterns": [
+      "No generic Inter/Roboto typography for headers",
+      "No default purple/violet tech gradients",
+      "No cramped card grids without padding",
+      "No transparent overlays without backdrop blurs",
+      "No generic 'camera off' blank screens - always show stylized camera permissions / live skeleton canvas placeholder",
+      "No missing navigation or orphan mobile screens"
+    ]
+  },
+  "theme": {
+    "mode": "dark",
+    "backgrounds": {
+      "primary": "#090A0F",
+      "secondary": "#12141D",
+      "surface": "#1A1D2B",
+      "glass_panel": "rgba(26, 29, 43, 0.75)",
+      "hud_overlay": "rgba(9, 10, 15, 0.85)"
+    },
+    "colors": {
+      "accent_primary": "#E2F13B",
+      "accent_hover": "#D1E228",
+      "accent_subtle": "rgba(226, 241, 59, 0.15)",
+      "status_active": "#22C55E",
+      "status_warning": "#F59E0B",
+      "text_main": "#F4F4F6",
+      "text_muted": "#8E93A6",
+      "text_dim": "#52576B",
+      "border": "rgba(255, 255, 255, 0.12)",
+      "border_active": "rgba(226, 241, 59, 0.5)"
+    }
+  },
+  "typography": {
+    "headings": {
+      "font_family": "Syne, Cabinet Grotesk, sans-serif",
+      "h1": "text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-none",
+      "h2": "text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight",
+      "h3": "text-xl sm:text-2xl font-semibold tracking-normal",
+      "h4": "text-lg sm:text-xl font-medium"
+    },
+    "body": {
+      "font_family": "Plus Jakarta Sans, Manrope, sans-serif",
+      "base": "text-base font-normal leading-relaxed",
+      "small": "text-sm font-normal text-muted"
+    },
+    "tech_hud": {
+      "font_family": "JetBrains Mono, Space Mono, monospace",
+      "badge": "text-xs tracking-widest uppercase font-mono"
+    }
+  },
+  "spacing_and_layout": {
+    "container_padding": "p-4 sm:p-6 lg:p-10",
+    "card_padding": "p-6 sm:p-8",
+    "grid_gap": "gap-6 sm:gap-8",
+    "bento_grid": "grid grid-cols-1 md:grid-cols-12 gap-6"
+  },
+  "image_urls": {
+    "hero_fashion_model": "https://images.unsplash.com/photo-1659522761084-79196b64abe4?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDF8MHwxfHNlYXJjaHszfHxmYXNoaW9uJTIwbW9kZWwlMjBwb3J0cmFpdHxlbnwwfHx8fDE3ODg5NzcxNjN8MA&ixlib=rb-4.1.0&q=85",
+    "editorial_model_alt": "https://images.unsplash.com/photo-1664515226058-03952a19bd76?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDF8MHwxfHNlYXJjaHw0fHxmYXNoaW9uJTIwbW9kZWwlMjBwb3J0cmFpdHxlbnwwfHx8fDE3ODg5NzcxNjN8MA&ixlib=rb-4.1.0&q=85",
+    "garments": [
+      {
+        "id": "white_oversized_tee",
+        "name": "AURA Oversized Heavy Tee",
+        "category": "T-Shirts",
+        "color": "Essential White",
+        "image_url": "https://images.unsplash.com/photo-1651761179569-4ba2aa054997?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NzV8MHwxfHNlYXJjaHwyfHxzdHJlZXR3ZWFyJTIwY2xvdGhpbmclMjBtb2NrdXB8ZW58MHx8fHwxNzg4OTc3MTYzfDA&ixlib=rb-4.1.0&q=85"
+      },
+      {
+        "id": "cyber_graphic_tee",
+        "name": "Neon Cyber Print Tee",
+        "category": "T-Shirts",
+        "color": "Obsidian Graphic",
+        "image_url": "https://images.unsplash.com/photo-1503341733017-1901578f9f1e?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NzV8MHwxfHNlYXJjaHw0fHxzdHJlZXR3ZWFyJTIwY2xvdGhpbmclMjBtb2NrdXB8ZW58MHx8fHwxNzg4OTc3MTYzfDA&ixlib=rb-4.1.0&q=85"
+      },
+      {
+        "id": "bomber_jacket_terracotta",
+        "name": "Tactical Flight Bomber",
+        "category": "Outerwear",
+        "color": "Terracotta Tan",
+        "image_url": "https://images.unsplash.com/photo-1591047139829-d91aecb6caea?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzNDR8MHwxfHNlYXJjaHxffHxqYWNrZXQlMjBjbG90aGluZyUyMG1vY2t1cHxlbnwwfHx8fDE3ODg5NzcxNzR8MA&ixlib=rb-4.1.0&q=85"
+      }
+    ]
+  },
+  "key_views": {
+    "landing_page": {
+      "hero_title": "Virtual Fitting Room in 60FPS AR",
+      "hero_subtitle": "Experience real-time cloth warping and 3D body tracking on your laptop, controlled live via your phone.",
+      "cta_desktop": "Launch Laptop Mirror",
+      "cta_mobile": "Open Mobile Remote",
+      "features_bento": [
+        "33-Landmark MediaPipe Skeleton Tracking",
+        "Dual-Screen QR Code Remote Pairing",
+        "Multi-Angle Fit Adjustments (Fitted / Regular / Relaxed)",
+        "Instant Snapshot & Fitting Room Gallery"
+      ]
+    },
+    "laptop_mirror": {
+      "camera_view": "Fullscreen responsive AR canvas with real-time pose skeleton mesh overlay",
+      "floating_qr_panel": "Glassmorphism card (backdrop-blur-xl bg-surface/80 border-border) displaying dynamic QR code to pair mobile device with token",
+      "status_bar": "Live FPS counter, active pose landmark counter (33/33), sync indicator ('Phone Connected' / 'Waiting for Remote')",
+      "controls": "Snapshot Capture, Toggle Skeleton, Garment Quick Swapper, Fullscreen Toggle"
+    },
+    "phone_remote": {
+      "type": "Mobile PWA Controller",
+      "sections": [
+        "Connection Banner (Session Token & Sync Pill)",
+        "Garment Carousel / Wardrobe Grid",
+        "Fit Controls Segmented Toggle (Fitted, Regular, Relaxed)",
+        "Angle View Selector (Auto, Front, Back)",
+        "Skeleton Overlay Toggle & Garment Removal",
+        "Mini Mirror Preview Feed / Canvas Thumbnail"
+      ]
+    }
+  },
+  "testing_and_accessibility": {
+    "data_testid_convention": "kebab-case role-based identifiers for automated testing",
+    "required_test_ids": [
+      "nav-brand-logo",
+      "launch-mirror-button",
+      "open-remote-button",
+      "webcam-ar-canvas",
+      "qr-pairing-panel",
+      "pairing-code-display",
+      "connection-status-pill",
+      "fit-control-fitted",
+      "fit-control-regular",
+      "fit-control-relaxed",
+      "angle-view-front",
+      "angle-view-back",
+      "angle-view-auto",
+      "skeleton-toggle-button",
+      "remove-garment-button",
+      "garment-card-item",
+      "take-snapshot-button",
+      "pwa-install-banner"
+    ]
+  },
+  "UNIVERSAL GUIDELINES FOR MAIN AGENT": [
+    "You have .js / .jsx files in frontend, NOT .tsx files. Follow React .js component conventions.",
+    "Do NOT use Inter font for headlines. Use Syne, Cabinet Grotesk, or font-serif for editorial punch.",
+    "Use backdrop-blur-xl and semi-transparent borders for all AR HUD and floating panels.",
+    "Ensure camera fallback state is stylish (e.g. animated pose skeleton graphic + camera permission prompt).",
+    "All interactive elements (buttons, inputs, garment cards, toggles) MUST have data-testid attributes.",
+    "Keep mobile PWA view responsive, touch-friendly, and optimized for phone screens with haptic-like button states."
+  ]
+}
